@@ -1,0 +1,4 @@
+feat: add locally hosted MP4 channel viewer
+
+Add ffprobe preflight, loopback byte-range streaming, shared playback state,
+checkpoint restore, and a muted browser UI with playback error handling.
