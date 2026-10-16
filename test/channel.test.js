@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { Channel, restorePosition } from '../src/channel.js';
+import { loadMediaSnapshot } from '../src/media.js';
 
 async function temporaryDirectory() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'waczak-tv-'));
@@ -63,6 +64,46 @@ test('advances by the server clock and writes an atomic checkpoint', async (t) =
   const checkpoint = JSON.parse(await fs.readFile(checkpointPath, 'utf8'));
   assert.equal(checkpoint.filename, 'a.mp4');
   assert.ok(checkpoint.position >= 0 && checkpoint.position < 5);
+});
+
+test('plays the alphabetical playlist by probed duration and wraps at its end', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const durations = { 'a.mp4': 2, 'b.mp4': 3, 'c.mp4': 4 };
+  for (const filename of ['c.mp4', 'a.mp4', 'b.mp4']) {
+    await fs.writeFile(path.join(directory, filename), filename);
+  }
+
+  const probe = async (filePath) => ({ duration: durations[path.basename(filePath)] });
+  const items = await loadMediaSnapshot(directory, {
+    probe,
+  });
+  const channel = new Channel(items, {
+    mediaFolder: directory,
+    probe,
+    log: { error: assert.fail },
+  });
+  const start = channel.startedAtMs;
+
+  assert.equal(channel.state(start).item.filename, 'a.mp4');
+  await channel.tick(start + 1500);
+  assert.equal(channel.state(start + 1500).item.filename, 'a.mp4');
+  assert.equal(channel.state(start + 1500).position, 1.5);
+
+  await channel.tick(start + 2000);
+  assert.equal(channel.state(start + 2000).item.filename, 'b.mp4');
+  assert.equal(channel.state(start + 2000).position, 0);
+
+  await channel.tick(start + 5000);
+  assert.equal(channel.state(start + 5000).item.filename, 'c.mp4');
+  assert.equal(channel.state(start + 5000).position, 0);
+
+  await channel.tick(start + 9000);
+  assert.equal(channel.state(start + 9000).item.filename, 'a.mp4');
+  assert.equal(channel.state(start + 9000).position, 0);
+  await channel.tick(start + 11000);
+  assert.equal(channel.state(start + 11000).item.filename, 'b.mp4');
+  assert.equal(channel.state(start + 11000).position, 0);
 });
 
 test('skips a media file that becomes unusable and keeps the alphabetical schedule', async (t) => {

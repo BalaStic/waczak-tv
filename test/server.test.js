@@ -89,6 +89,8 @@ test('uses the server state endpoint as the playback authority', async (t) => {
     [{ id: '0', filename: 'episode.mp4', path: mediaPath, duration: 30 }],
     { mediaFolder: directory, log: { error: assert.fail } },
   );
+  channel.startedAtMs -= 5000;
+  const scheduledStartMs = channel.startedAtMs;
   const server = createHttpServer({ channel, mediaFolder: directory, publicFolder });
   t.after(() => new Promise((resolve) => server.close(resolve)));
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -101,6 +103,15 @@ test('uses the server state endpoint as the playback authority', async (t) => {
   assert.equal(state.status, 'playing');
   assert.equal(state.item.filename, 'episode.mp4');
   assert.ok(Number.isFinite(state.serverTimeMs));
+  assert.ok(state.position >= 5);
+  assert.equal(state.position, (state.serverTimeMs - scheduledStartMs) / 1000);
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  const secondResponse = await request(`http://127.0.0.1:${server.address().port}/api/state`);
+  const secondState = JSON.parse(secondResponse.body);
+  assert.equal(secondState.item.filename, 'episode.mp4');
+  assert.ok(secondState.position > state.position);
+  assert.equal(channel.startedAtMs, scheduledStartMs);
 });
 
 test('recovers when the media route detects a missing scheduled file', async (t) => {
