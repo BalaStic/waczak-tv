@@ -96,6 +96,67 @@ test('skips a media file that becomes unusable and keeps the alphabetical schedu
   assert.equal(channel.state(scheduleStart + 2500).position, 0.5);
 });
 
+test('checks later candidates when the scheduled file becomes unavailable', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const items = [
+    { id: '0', filename: 'a.mp4', path: path.join(directory, 'a.mp4'), duration: 30 },
+    { id: '1', filename: 'b.mp4', path: path.join(directory, 'b.mp4'), duration: 30 },
+    { id: '2', filename: 'c.mp4', path: path.join(directory, 'c.mp4'), duration: 30 },
+  ];
+  await fs.writeFile(items[1].path, 'broken');
+  await fs.writeFile(items[2].path, 'playable');
+  const errors = [];
+  const channel = new Channel(items, {
+    mediaFolder: directory,
+    probe: async (filePath) => {
+      if (path.basename(filePath) === 'b.mp4') throw new Error('invalid media');
+      return { duration: 30 };
+    },
+    log: { error: (message) => errors.push(message) },
+  });
+  const now = channel.startedAtMs + 500;
+
+  await channel.tick(now);
+
+  assert.equal(channel.state(now).status, 'playing');
+  assert.equal(channel.state(now).item.filename, 'c.mp4');
+  assert.deepEqual(channel.items.map((item) => item.filename), ['c.mp4']);
+  assert.ok(errors.some((message) => message.includes('a.mp4')));
+  assert.ok(errors.some((message) => message.includes('b.mp4: invalid media')));
+});
+
+test('wraps through remaining candidates once and stops when they are unusable', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const items = [];
+  for (const [index, filename] of ['a.mp4', 'b.mp4', 'c.mp4'].entries()) {
+    const filePath = path.join(directory, filename);
+    if (filename !== 'b.mp4') await fs.writeFile(filePath, 'broken');
+    items.push({ id: String(index), filename, path: filePath, duration: 1 });
+  }
+  const probeCalls = [];
+  const errors = [];
+  const channel = new Channel(items, {
+    mediaFolder: directory,
+    index: 1,
+    probe: async (filePath) => {
+      probeCalls.push(path.basename(filePath));
+      throw new Error('invalid media');
+    },
+    log: { error: (message) => errors.push(message) },
+  });
+  const now = channel.startedAtMs + 500;
+
+  await channel.tick(now);
+
+  assert.deepEqual(probeCalls, ['c.mp4', 'a.mp4']);
+  assert.equal(channel.state(now).status, 'stopped');
+  assert.equal(channel.state(now).item, null);
+  assert.match(channel.state(now).error, /No playable media remains/);
+  assert.ok(errors.some((message) => message.includes('b.mp4')));
+});
+
 test('stops with an explicit error when the last file becomes unavailable', async (t) => {
   const directory = await temporaryDirectory();
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

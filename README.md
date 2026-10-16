@@ -37,7 +37,7 @@ At launch, the server snapshots regular `.mp4` files in the configured folder, s
 - Viewers load the same server-authoritative item and playhead. State is refreshed every two seconds; drift over 1.5 seconds is corrected locally. Browser stalls or decode errors affect only that viewer.
 - MP4 delivery supports byte ranges for seeking and late joins. The server serves only IDs from its startup media snapshot and verifies that each requested file resolves directly inside the configured folder.
 - Playback position is checkpointed atomically every five seconds and on item transitions to `%LOCALAPPDATA%\waczak-tv\checkpoint.json`. Downtime does not advance the saved position. If a saved file is no longer playable, the next alphabetical item is selected; malformed checkpoints are reported and ignored.
-- Files are rechecked when they are scheduled and while they are current. If no playable file remains, the channel stops and reports the reason in the server console and viewer page.
+- Files are rechecked when they are scheduled and while they are current. If a scheduled file becomes unavailable, the server logs its filename and reason, then checks following alphabetical candidates, wrapping at most once. If none are playable, the channel stops and reports a clear error in the server console and viewer page.
 
 To diagnose an unplayable file, try opening it in a current browser and inspect its codecs with:
 

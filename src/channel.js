@@ -47,59 +47,58 @@ export class Channel {
         this.stop(`No playable media remains. ${current.filename} is unavailable.`);
         return;
       }
-      this.index %= this.items.length;
-      this.startedAtMs = now;
+      const candidates = [
+        ...this.items.slice(this.index),
+        ...this.items.slice(0, this.index),
+      ];
+      if (!(await this.#selectNextPlayable(candidates, now, current.filename))) return;
     }
 
     while (this.status === 'playing') {
       const item = this.items[this.index];
       const boundary = this.startedAtMs + item.duration * 1000;
       if (now < boundary) break;
-      await this.advance(boundary, now);
+      await this.advance(boundary);
       changed = true;
     }
 
     if (changed) await this.writeCheckpoint();
   }
 
-  async advance(boundary, now) {
+  async advance(boundary) {
     const previousItem = this.items[this.index];
-    const candidateCount = this.items.length;
-    let checked = 0;
-    let candidateIndex = (this.index + 1) % candidateCount;
+    const candidates = [
+      ...this.items.slice(this.index + 1),
+      ...this.items.slice(0, this.index + 1),
+    ];
+    await this.#selectNextPlayable(candidates, boundary, previousItem.filename);
+  }
 
-    while (checked < candidateCount && this.items.length > 0) {
-      const candidate = this.items[candidateIndex];
-      let failure;
+  async #selectNextPlayable(candidates, boundary, previousFilename) {
+    for (const candidate of candidates) {
+      const candidateIndex = this.items.indexOf(candidate);
+      if (candidateIndex < 0) continue;
+
       try {
-        const { handle } = await readSafeMediaFile(candidate, this.mediaFolder);
-        await handle.close();
-        const metadata = await this.probe(candidate.path);
+        const metadata = await checkItemIsUsable(candidate, this.mediaFolder, this.probe);
         candidate.duration = metadata.duration;
       } catch (error) {
-        failure = error;
+        this.log.error(`Media unavailable: ${candidate.filename}: ${error.message}`);
+        this.items.splice(candidateIndex, 1);
+        if (this.items.length === 0) {
+          this.stop(`No playable media remains. ${candidate.filename} is unavailable.`);
+          return false;
+        }
+        continue;
       }
 
-      if (!failure) {
-        this.index = candidateIndex;
-        this.startedAtMs = boundary;
-        return;
-      }
-
-      this.log.error(`Media unavailable: ${candidate.filename}: ${failure.message}`);
-      this.items.splice(candidateIndex, 1);
-      checked += 1;
-      if (this.items.length === 0) {
-        this.stop(`No playable media remains. ${candidate.filename} is unavailable.`);
-        return;
-      }
-      if (candidateIndex >= this.items.length) candidateIndex = 0;
+      this.index = this.items.indexOf(candidate);
+      this.startedAtMs = boundary;
+      return true;
     }
 
-    this.stop(`No playable media remains after ${previousItem.filename}.`);
-    if (this.status === 'playing') {
-      this.startedAtMs = now;
-    }
+    this.stop(`No playable media remains after ${previousFilename}.`);
+    return false;
   }
 
   async markUnavailable(id, reason) {
@@ -115,10 +114,20 @@ export class Channel {
       return;
     }
 
-    if (unavailableIndex < this.index) this.index -= 1;
-    if (unavailableIndex === this.index) this.startedAtMs = Date.now();
-    this.index %= this.items.length;
-    await this.tick();
+    if (unavailableIndex < this.index) {
+      this.index -= 1;
+      await this.tick();
+    } else if (unavailableIndex === this.index) {
+      this.index %= this.items.length;
+      this.startedAtMs = Date.now();
+      const candidates = [
+        ...this.items.slice(this.index),
+        ...this.items.slice(0, this.index),
+      ];
+      await this.#selectNextPlayable(candidates, this.startedAtMs, item.filename);
+    } else {
+      await this.tick();
+    }
     await this.writeCheckpoint();
   }
 
@@ -218,5 +227,5 @@ export async function restorePosition(items, checkpointPath, log = console) {
 export async function checkItemIsUsable(item, mediaFolder, probe = probeMedia) {
   const { handle } = await readSafeMediaFile(item, mediaFolder);
   await handle.close();
-  await probe(item.path);
+  return probe(item.path);
 }

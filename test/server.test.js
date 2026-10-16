@@ -103,6 +103,43 @@ test('uses the server state endpoint as the playback authority', async (t) => {
   assert.ok(Number.isFinite(state.serverTimeMs));
 });
 
+test('recovers when the media route detects a missing scheduled file', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const items = [];
+  for (const [index, filename] of ['a.mp4', 'b.mp4', 'c.mp4'].entries()) {
+    const filePath = path.join(directory, filename);
+    if (filename !== 'a.mp4') await fs.writeFile(filePath, filename);
+    items.push({ id: String(index), filename, path: filePath, duration: 30 });
+  }
+  const errors = [];
+  const channel = new Channel(items, {
+    mediaFolder: directory,
+    probe: async (filePath) => {
+      if (path.basename(filePath) === 'b.mp4') throw new Error('invalid media');
+      return { duration: 30 };
+    },
+    log: { error: (message) => errors.push(message) },
+  });
+  const server = createHttpServer({
+    channel,
+    mediaFolder: directory,
+    publicFolder: directory,
+  });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  const missingMedia = await request(`http://127.0.0.1:${server.address().port}/media/0`);
+  assert.equal(missingMedia.status, 404);
+
+  const stateResponse = await request(`http://127.0.0.1:${server.address().port}/api/state`);
+  const state = JSON.parse(stateResponse.body);
+  assert.equal(state.status, 'playing');
+  assert.equal(state.item.filename, 'c.mp4');
+  assert.ok(errors.some((message) => message.includes('a.mp4')));
+  assert.ok(errors.some((message) => message.includes('b.mp4: invalid media')));
+});
+
 test('logs request failures and returns an explicit server error', async (t) => {
   const directory = await temporaryDirectory();
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
