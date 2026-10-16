@@ -28,6 +28,8 @@ A manually launched, Windows-hosted MP4 channel for browsers on the same PC. The
 
 3. Open the printed URL (normally `http://127.0.0.1:4173/`) in Edge, Chrome, or Firefox. Playback starts muted; use the volume control to unmute or adjust it. If browser autoplay is blocked, select **Start playback**.
 
+The native player follows the shared channel item and live position. It starts muted, with controls to unmute or adjust the volume. If browser autoplay is blocked, select **Start playback**.
+
 The configuration path can be overridden with `WACZAK_TV_CONFIG`; the port can be changed with `PORT`. The server always binds to `127.0.0.1`, never a LAN interface.
 
 At launch, the server snapshots regular `.mp4` files in the configured folder, sorts names case-insensitively with a deterministic tie-break, and asks `ffprobe` to confirm a video stream and positive duration. Unusable files are reported by name and skipped. The server exits with a clear error if the folder is missing/unreadable or no playable file remains. Add or remove files by restarting the server.

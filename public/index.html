@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
     <title>waczak-tv</title>
+    <!-- Video.js temporarily disabled in favor of native playback.
+    <link rel="stylesheet" href="https://vjs.zencdn.net/8.23.4/video-js.css">
+    <script src="https://vjs.zencdn.net/8.23.4/video.min.js" defer></script>
+    -->
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
@@ -36,6 +40,21 @@
       </section>
 
       <p id="error-message" class="error-message" role="alert" hidden></p>
+
+      <!-- Video.js player temporarily disabled.
+      <section class="videojs-section" aria-labelledby="videojs-heading">
+        <div class="videojs-heading">
+          <div>
+            <p class="eyebrow">CHANNEL PLAYER</p>
+            <h2 id="videojs-heading">Video.js</h2>
+          </div>
+          <p id="videojs-status" class="videojs-status" role="status" aria-live="polite">Waiting for the channel…</p>
+        </div>
+        <div class="videojs-screen">
+          <video id="videojs-player" class="video-js vjs-big-play-centered" controls playsinline preload="auto"></video>
+        </div>
+      </section>
+      -->
     </main>
   </body>
 </html>
