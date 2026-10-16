@@ -27,21 +27,47 @@ test('restores valid checkpoints and falls forward for stale positions', async (
 
   await fs.writeFile(checkpointPath, JSON.stringify({ filename: 'a1.mp4', position: 1 }));
   assert.deepEqual(await restorePosition(items, checkpointPath), { index: 1, position: 0 });
+
+  await fs.writeFile(checkpointPath, JSON.stringify({ filename: 'z.mp4', position: 1 }));
+  assert.deepEqual(await restorePosition(items, checkpointPath), { index: 0, position: 0 });
 });
 
-test('ignores malformed checkpoints and logs the reason', async (t) => {
+test('starts at the first item when the checkpoint is missing and resumes without downtime', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const checkpointPath = path.join(directory, 'checkpoint.json');
+  const items = [
+    { id: '0', filename: 'a.mp4', path: '', duration: 10 },
+    { id: '1', filename: 'b.mp4', path: '', duration: 20 },
+  ];
+
+  const firstRun = await restorePosition(items, checkpointPath);
+  assert.deepEqual(firstRun, { index: 0, position: 0 });
+  const firstChannel = new Channel(items, firstRun);
+  assert.equal(firstChannel.state().item.filename, 'a.mp4');
+  assert.ok(firstChannel.state().position < 0.2);
+
+  await fs.writeFile(checkpointPath, JSON.stringify({ filename: 'b.mp4', position: 5 }));
+  const restored = await restorePosition(items, checkpointPath);
+  const restartedChannel = new Channel(items, restored);
+  const state = restartedChannel.state();
+  assert.equal(state.item.filename, 'b.mp4');
+  assert.ok(state.position >= 5 && state.position < 5.2);
+});
+
+test('ignores malformed checkpoints and warns about the reason', async (t) => {
   const directory = await temporaryDirectory();
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const checkpointPath = path.join(directory, 'checkpoint.json');
   const items = [{ id: '0', filename: 'a.mp4', path: '', duration: 10 }];
-  const errors = [];
+  const warnings = [];
   await fs.writeFile(checkpointPath, '{broken');
 
-  assert.deepEqual(await restorePosition(items, checkpointPath, { error: (message) => errors.push(message) }), {
+  assert.deepEqual(await restorePosition(items, checkpointPath, { warn: (message) => warnings.push(message) }), {
     index: 0,
     position: 0,
   });
-  assert.equal(errors.length, 1);
+  assert.equal(warnings.length, 1);
 });
 
 test('advances by the server clock and writes an atomic checkpoint', async (t) => {
@@ -64,6 +90,40 @@ test('advances by the server clock and writes an atomic checkpoint', async (t) =
   const checkpoint = JSON.parse(await fs.readFile(checkpointPath, 'utf8'));
   assert.equal(checkpoint.filename, 'a.mp4');
   assert.ok(checkpoint.position >= 0 && checkpoint.position < 5);
+});
+
+test('continues playback after a checkpoint failure and saves successfully on a later retry', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const mediaPath = path.join(directory, 'a.mp4');
+  await fs.writeFile(mediaPath, 'media');
+  const checkpointFolder = path.join(directory, 'state');
+  await fs.writeFile(checkpointFolder, 'not a directory');
+  const errors = [];
+  const channel = new Channel(
+    [{ id: '0', filename: 'a.mp4', path: mediaPath, duration: 10 }],
+    {
+      mediaFolder: directory,
+      checkpointPath: path.join(checkpointFolder, 'checkpoint.json'),
+      log: { error: (message) => errors.push(message) },
+    },
+  );
+
+  await channel.writeCheckpoint();
+
+  assert.equal(channel.state().status, 'playing');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /Cannot write playback checkpoint/);
+
+  await fs.unlink(checkpointFolder);
+  await fs.mkdir(checkpointFolder);
+  await channel.writeCheckpoint();
+
+  const checkpoint = JSON.parse(
+    await fs.readFile(path.join(checkpointFolder, 'checkpoint.json'), 'utf8'),
+  );
+  assert.equal(checkpoint.filename, 'a.mp4');
+  assert.equal(errors.length, 1);
 });
 
 test('plays the alphabetical playlist by probed duration and wraps at its end', async (t) => {

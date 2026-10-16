@@ -15,6 +15,7 @@ export class Channel {
     this.status = 'playing';
     this.error = null;
     this.tickInProgress = null;
+    this.checkpointWriteInProgress = null;
   }
 
   async tick(now = Date.now()) {
@@ -160,6 +161,22 @@ export class Channel {
 
   async writeCheckpoint() {
     if (!this.checkpointPath || this.items.length === 0) return;
+
+    const write = (this.checkpointWriteInProgress || Promise.resolve()).then(() =>
+      this.#writeCheckpoint(),
+    );
+    this.checkpointWriteInProgress = write;
+    try {
+      await write;
+    } finally {
+      if (this.checkpointWriteInProgress === write) {
+        this.checkpointWriteInProgress = null;
+      }
+    }
+  }
+
+  async #writeCheckpoint() {
+    if (!this.checkpointPath || this.items.length === 0) return;
     const state = this.state();
     if (!state.item) return;
 
@@ -193,7 +210,7 @@ export async function restorePosition(items, checkpointPath, log = console) {
     checkpoint = JSON.parse(raw);
   } catch (error) {
     if (error.code === 'ENOENT') return { index: 0, position: 0 };
-    log.error(`Ignoring invalid playback checkpoint ${checkpointPath}: ${error.message}`);
+    log.warn(`Ignoring invalid playback checkpoint ${checkpointPath}: ${error.message}`);
     return { index: 0, position: 0 };
   }
 
@@ -209,7 +226,7 @@ export async function restorePosition(items, checkpointPath, log = console) {
     !Number.isFinite(checkpoint.position) ||
     checkpoint.position < 0
   ) {
-    log.error(`Ignoring invalid playback checkpoint ${checkpointPath}: expected a filename and non-negative position.`);
+    log.warn(`Ignoring invalid playback checkpoint ${checkpointPath}: expected a filename and non-negative position.`);
     return { index: 0, position: 0 };
   }
 
