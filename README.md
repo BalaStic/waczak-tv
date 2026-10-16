@@ -26,7 +26,7 @@ A manually launched, Windows-hosted MP4 channel for browsers on the same PC. The
    npm start
    ```
 
-3. Open the printed URL (normally `http://127.0.0.1:4173/`) in Edge, Chrome, or Firefox. Playback is muted. If browser autoplay is blocked, select **Start playback**.
+3. Open the printed URL (normally `http://127.0.0.1:4173/`) in Edge, Chrome, or Firefox. Playback starts muted; use the volume control on the video to unmute or adjust it. If browser autoplay is blocked, select **Start playback**.
 
 The configuration path can be overridden with `WACZAK_TV_CONFIG`; the port can be changed with `PORT`. The server always binds to `127.0.0.1`, never a LAN interface.
 

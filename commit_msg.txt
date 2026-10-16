@@ -1,4 +1,2 @@
-feat: add locally hosted MP4 channel viewer
+feat(player): add volume-only video controls
 
-Add ffprobe preflight, loopback byte-range streaming, shared playback state,
-checkpoint restore, and a muted browser UI with playback error handling.

@@ -78,10 +78,41 @@ video {
 
 .video-message {
   position: absolute;
+  z-index: 1;
   inset: auto 0 0;
-  padding: 16px 20px;
+  padding: 16px 190px 16px 20px;
   background: linear-gradient(transparent, #000d);
   color: #fff;
+}
+
+.video-controls {
+  position: absolute;
+  z-index: 2;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #ffffff33;
+  border-radius: 8px;
+  background: #090b0fcc;
+}
+
+.video-controls button {
+  padding: 6px 10px;
+  background: #252a33;
+  color: #f4f5f7;
+  font-size: 0.8rem;
+}
+
+.video-controls button:hover {
+  background: #39404c;
+}
+
+.video-controls input[type="range"] {
+  width: 110px;
+  accent-color: #77d89a;
 }
 
 .now-playing {
@@ -136,5 +167,20 @@ button:hover {
   .now-playing {
     flex-direction: column;
     padding-top: 14px;
+  }
+
+  .video-message {
+    padding-right: 165px;
+  }
+
+  .video-controls {
+    right: 8px;
+    bottom: 8px;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .video-controls input[type="range"] {
+    width: 90px;
   }
 }

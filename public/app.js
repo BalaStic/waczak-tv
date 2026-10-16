@@ -4,12 +4,19 @@ const filenameElement = document.querySelector('#filename');
 const startButton = document.querySelector('#start-button');
 const errorElement = document.querySelector('#error-message');
 const videoMessage = document.querySelector('#video-message');
+const volumeButton = document.querySelector('#volume-button');
+const volumeSlider = document.querySelector('#volume-slider');
 
 const statePollMs = 2000;
 const driftToleranceSeconds = 1.5;
 let currentItemId = null;
 let lastState = null;
 let pendingPlay = false;
+
+function updateVolumeControls() {
+  volumeButton.textContent = video.muted ? 'Unmute' : 'Mute';
+  volumeSlider.value = String(video.volume);
+}
 
 function showPlaybackError(message) {
   errorElement.textContent = message;
@@ -136,6 +143,20 @@ video.addEventListener('playing', () => {
 video.addEventListener('ended', () => {
   if (lastState) applyState(lastState);
 });
+
+volumeButton.addEventListener('click', () => {
+  video.muted = !video.muted;
+  updateVolumeControls();
+});
+
+volumeSlider.addEventListener('input', () => {
+  video.volume = Number(volumeSlider.value);
+  video.muted = video.volume === 0;
+  updateVolumeControls();
+});
+
+video.addEventListener('volumechange', updateVolumeControls);
+updateVolumeControls();
 
 startButton.addEventListener('click', async () => {
   pendingPlay = false;
