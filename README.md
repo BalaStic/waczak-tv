@@ -11,7 +11,7 @@ A manually launched, Windows-hosted MP4 channel for browsers on the same PC. The
 
 ## Configure and launch
 
-1. Create `%LOCALAPPDATA%\waczak-tv\config.json`. For example:
+1. Create `config.json` in the application root folder (the same folder as `package.json`). For example:
 
    ```json
    {

@@ -1,6 +1,9 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const applicationRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export class StartupError extends Error {
   constructor(message, options) {
@@ -14,14 +17,7 @@ export function getConfigPath(env = process.env) {
     return path.resolve(env.WACZAK_TV_CONFIG);
   }
 
-  const localAppData = env.LOCALAPPDATA;
-  if (!localAppData) {
-    throw new StartupError(
-      'LOCALAPPDATA is not set. Set WACZAK_TV_CONFIG to the full path of your config.json file.',
-    );
-  }
-
-  return path.join(localAppData, 'waczak-tv', 'config.json');
+  return path.join(applicationRoot, 'config.json');
 }
 
 export async function loadConfig(configPath = getConfigPath()) {

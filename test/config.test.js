@@ -2,12 +2,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { loadConfig } from '../src/config.js';
+import { getConfigPath, loadConfig } from '../src/config.js';
 
 async function temporaryDirectory() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'waczak-tv-config-'));
 }
+
+test('uses config.json in the application root unless overridden', () => {
+  const applicationRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(getConfigPath({}), path.join(applicationRoot, 'config.json'));
+
+  const override = path.join('custom', 'config.json');
+  assert.equal(getConfigPath({ WACZAK_TV_CONFIG: override }), path.resolve(override));
+});
 
 test('loads a relative media folder from a valid config', async (t) => {
   const directory = await temporaryDirectory();
