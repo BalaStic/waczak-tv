@@ -11,6 +11,7 @@ const statePollMs = 2000;
 const driftToleranceSeconds = 1.5;
 video.defaultMuted = true;
 video.muted = true;
+video.volume = 0.1;
 let currentItemId = null;
 let lastState = null;
 let pendingPlay = false;

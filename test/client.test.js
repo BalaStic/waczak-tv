@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const appSource = await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8');
 const indexSource = await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const stylesSource = await fs.readFile(new URL('../public/styles.css', import.meta.url), 'utf8');
 
 class FakeElement {
   constructor() {
@@ -184,13 +185,15 @@ async function createViewer(initialState, initialTime = 10000) {
   };
 }
 
-test('late viewers wait for metadata, seek to the server position, and play muted', async () => {
+test('late viewers wait for metadata, seek to the server position, and play muted at low volume', async () => {
   const viewer = await createViewer(playingState({ serverTimeMs: 9000 }));
   assert.equal(viewer.intervals[0].delay, 2000);
   assert.equal(viewer.video.src, '/media/42');
   assert.equal(viewer.video.playCalls, 0);
   assert.equal(viewer.video.muted, true);
   assert.equal(viewer.video.defaultMuted, true);
+  assert.equal(viewer.video.volume, 0.1);
+  assert.equal(viewer.elements.get('#volume-slider').value, '0.1');
 
   viewer.video.readyState = 1;
   await viewer.video.dispatch('loadedmetadata');
@@ -207,13 +210,24 @@ test('mute control uses a speaker icon with an accessible label', () => {
   );
 });
 
-test('viewers can unmute and adjust volume independently', async () => {
+test('volume controls sit vertically beside the screen and start at ten percent', () => {
+  assert.match(
+    indexSource,
+    /<div class="player-row">\s*<section class="screen"[\s\S]*?<\/section>\s*<div class="video-controls"[^>]*>\s*<input id="volume-slider"[^>]*value="0\.1"[^>]*>\s*<button id="volume-button" type="button" aria-label="Unmute">/,
+  );
+  assert.match(stylesSource, /\.player-row\s*\{[^}]*display:\s*flex/);
+  assert.match(stylesSource, /\.video-controls\s*\{[^}]*flex-direction:\s*column/);
+  assert.match(stylesSource, /\.video-controls input\[type="range"\]\s*\{[^}]*writing-mode:\s*vertical-lr/);
+  assert.match(indexSource, /<video id="video" autoplay muted playsinline><\/video>/);
+});
+
+test('viewers can toggle mute and adjust volume independently', async () => {
   const viewer = await createViewer(playingState({ serverTimeMs: 10000 }));
   const volumeButton = viewer.elements.get('#volume-button');
   const volumeSlider = viewer.elements.get('#volume-slider');
   assert.equal(volumeButton.attributes.get('aria-label'), 'Unmute');
   assert.equal(volumeButton.textContent, '');
-  assert.equal(volumeSlider.value, '1');
+  assert.equal(volumeSlider.value, '0.1');
 
   await volumeButton.dispatch('click');
   assert.equal(viewer.video.muted, false);
@@ -224,6 +238,7 @@ test('viewers can unmute and adjust volume independently', async () => {
   await volumeSlider.dispatch('input');
   assert.equal(viewer.video.volume, 0.4);
   assert.equal(viewer.video.muted, false);
+  assert.equal(volumeButton.attributes.get('aria-label'), 'Mute');
 
   volumeSlider.value = '0';
   await volumeSlider.dispatch('input');
@@ -314,6 +329,7 @@ test('an autoplay rejection offers a user gesture and a media error stays local 
   assert.equal(viewer.elements.get('#start-button').hidden, true);
   assert.equal(viewer.video.paused, false);
   assert.equal(viewer.video.muted, true);
+  assert.equal(viewer.video.volume, 0.1);
 
   viewer.video.error = { code: 3 };
   await viewer.video.dispatch('error');
