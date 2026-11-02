@@ -106,14 +106,44 @@ video {
 }
 
 .video-controls button {
-  padding: 6px 10px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  padding: 6px;
   background: #252a33;
   color: #f4f5f7;
-  font-size: 0.8rem;
 }
 
 .video-controls button:hover {
   background: #39404c;
+}
+
+.volume-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.volume-speaker {
+  fill: currentColor;
+  stroke: none;
+}
+
+.volume-muted {
+  display: none;
+}
+
+#volume-button[aria-label="Unmute"] .volume-waves {
+  display: none;
+}
+
+#volume-button[aria-label="Unmute"] .volume-muted {
+  display: block;
 }
 
 .video-controls input[type="range"] {

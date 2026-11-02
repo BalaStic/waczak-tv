@@ -4,12 +4,18 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const appSource = await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+const indexSource = await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 
 class FakeElement {
   constructor() {
     this.hidden = false;
     this.textContent = '';
     this.listeners = new Map();
+    this.attributes = new Map();
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, value);
   }
 
   addEventListener(type, listener, options = {}) {
@@ -194,16 +200,25 @@ test('late viewers wait for metadata, seek to the server position, and play mute
   assert.equal(viewer.elements.get('#channel-status').textContent, 'On air');
 });
 
+test('mute control uses a speaker icon with an accessible label', () => {
+  assert.match(
+    indexSource,
+    /<button id="volume-button" type="button" aria-label="Unmute">\s*<svg class="volume-icon" viewBox="0 0 24 24" aria-hidden="true">/,
+  );
+});
+
 test('viewers can unmute and adjust volume independently', async () => {
   const viewer = await createViewer(playingState({ serverTimeMs: 10000 }));
   const volumeButton = viewer.elements.get('#volume-button');
   const volumeSlider = viewer.elements.get('#volume-slider');
-  assert.equal(volumeButton.textContent, 'Unmute');
+  assert.equal(volumeButton.attributes.get('aria-label'), 'Unmute');
+  assert.equal(volumeButton.textContent, '');
   assert.equal(volumeSlider.value, '1');
 
   await volumeButton.dispatch('click');
   assert.equal(viewer.video.muted, false);
-  assert.equal(volumeButton.textContent, 'Mute');
+  assert.equal(volumeButton.attributes.get('aria-label'), 'Mute');
+  assert.equal(volumeButton.textContent, '');
 
   volumeSlider.value = '0.4';
   await volumeSlider.dispatch('input');
@@ -213,7 +228,8 @@ test('viewers can unmute and adjust volume independently', async () => {
   volumeSlider.value = '0';
   await volumeSlider.dispatch('input');
   assert.equal(viewer.video.muted, true);
-  assert.equal(volumeButton.textContent, 'Unmute');
+  assert.equal(volumeButton.attributes.get('aria-label'), 'Unmute');
+  assert.equal(volumeButton.textContent, '');
 });
 
 test('drift at the tolerance is ignored and larger drift is corrected on the next poll', async () => {

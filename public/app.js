@@ -32,7 +32,7 @@ function renderMessages() {
 }
 
 function updateVolumeControls() {
-  volumeButton.textContent = video.muted ? 'Unmute' : 'Mute';
+  volumeButton.setAttribute('aria-label', video.muted ? 'Unmute' : 'Mute');
   volumeSlider.value = String(video.volume);
 }
 
