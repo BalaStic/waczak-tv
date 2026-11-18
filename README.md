@@ -15,11 +15,20 @@ A manually launched, Windows-hosted MP4 channel for browsers on the same PC. The
 
    ```json
    {
-     "mediaFolder": "C:\\Users\\you\\Videos\\MP4s"
+     "mediaFolders": [
+       {
+         "mediaFolder": "C:\\Users\\you\\Videos\\MP4s",
+         "urlPath": "waczak-tv"
+       },
+       {
+         "mediaFolder": "D:\\Movies",
+         "urlPath": "movies"
+       }
+     ]
    }
    ```
 
-   `mediaFolder` may also be relative to the configuration file. `config.example.json` shows the required shape.
+   Each `mediaFolder` may be relative to the configuration file. Enter the `urlPath` at the end of the printed server URL to watch that folder (for example, `http://127.0.0.1:4173/waczak-tv`). The root URL is blank when using `mediaFolders`. For a single folder at the root URL, the existing `{ "mediaFolder": "..." }` format remains supported. `config.example.json` shows the multi-folder shape.
 2. From this project folder, run:
 
    ```powershell
@@ -32,7 +41,7 @@ The native player follows the shared channel item and live position. It starts m
 
 The configuration path can be overridden with `WACZAK_TV_CONFIG`; the port can be changed with `PORT`. The server always binds to `127.0.0.1`, never a LAN interface.
 
-At launch, the server snapshots regular `.mp4` files in the configured folder, sorts names case-insensitively with a deterministic tie-break, and asks `ffprobe` to confirm a video stream and positive duration. Unusable files are reported by name and skipped. The server exits with a clear error if the folder is missing/unreadable or no playable file remains. Add or remove files by restarting the server.
+At launch, the server snapshots regular `.mp4` files in each configured folder, sorts names case-insensitively with a deterministic tie-break, and asks `ffprobe` to confirm a video stream and positive duration. Each folder has its own channel and playback checkpoint. Unusable files are reported by name and skipped. The server exits with a clear error if a folder is missing/unreadable or no playable file remains. Add or remove files by restarting the server.
 
 ## Playback and recovery
 

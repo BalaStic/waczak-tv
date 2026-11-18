@@ -30,6 +30,49 @@ test('loads a relative media folder from a valid config', async (t) => {
   assert.equal(config.mediaFolder, await fs.realpath(mediaFolder));
 });
 
+test('loads multiple media folders with unique URL paths', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const firstFolder = path.join(directory, 'first');
+  const secondFolder = path.join(directory, 'second');
+  await fs.mkdir(firstFolder);
+  await fs.mkdir(secondFolder);
+  const configPath = path.join(directory, 'config.json');
+  await fs.writeFile(
+    configPath,
+    JSON.stringify({
+      mediaFolders: [
+        { mediaFolder: 'first', urlPath: 'waczak-tv' },
+        { mediaFolder: 'second', urlPath: 'other-channel' },
+      ],
+    }),
+  );
+
+  const config = await loadConfig(configPath);
+  assert.deepEqual(config.mediaFolders, [
+    { mediaFolder: await fs.realpath(firstFolder), urlPath: 'waczak-tv' },
+    { mediaFolder: await fs.realpath(secondFolder), urlPath: 'other-channel' },
+  ]);
+});
+
+test('rejects empty, unsafe, and duplicate media folder URL paths', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  await fs.mkdir(path.join(directory, 'videos'));
+  const configPath = path.join(directory, 'config.json');
+  for (const mediaFolders of [
+    [{ mediaFolder: 'videos', urlPath: '' }],
+    [{ mediaFolder: 'videos', urlPath: '../escape' }],
+    [
+      { mediaFolder: 'videos', urlPath: 'Channel' },
+      { mediaFolder: 'videos', urlPath: 'channel' },
+    ],
+  ]) {
+    await fs.writeFile(configPath, JSON.stringify({ mediaFolders }));
+    await assert.rejects(loadConfig(configPath), /urlPath/);
+  }
+});
+
 test('reports missing, malformed, and unusable configuration', async (t) => {
   const directory = await temporaryDirectory();
   t.after(() => fs.rm(directory, { recursive: true, force: true }));

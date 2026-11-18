@@ -11,7 +11,10 @@ A single shared, continuously advancing sequence of videos that all viewers obse
 The Windows PC running the local server and holding the configured media folder.
 
 **Media folder**:
-The single local folder whose MP4 files form the channel's playlist. The MVP takes a snapshot at server startup.
+One configured local folder whose MP4 files form a channel's playlist. The server takes a snapshot at startup.
+
+**URL path**:
+The single path segment that selects a configured media folder, such as `waczak-tv` in `/waczak-tv`.
 
 **Playlist**:
 The ordered list of MP4 files played by the channel. The MVP orders files alphabetically by filename and loops to the beginning.

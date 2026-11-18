@@ -6,6 +6,7 @@ const errorElement = document.querySelector('#error-message');
 const videoMessage = document.querySelector('#video-message');
 const volumeButton = document.querySelector('#volume-button');
 const volumeSlider = document.querySelector('#volume-slider');
+const channelBasePath = window.location.pathname.replace(/\/+$/, '');
 
 const statePollMs = 2000;
 const driftToleranceSeconds = 1.5;
@@ -129,7 +130,7 @@ async function applyState(state) {
       await startVideo(itemId, generation);
     };
     video.addEventListener('loadedmetadata', metadataHandler);
-    video.src = `/media/${encodeURIComponent(state.item.id)}`;
+    video.src = `${channelBasePath}/media/${encodeURIComponent(state.item.id)}`;
     video.load();
     return;
   }
@@ -159,7 +160,7 @@ async function pollState() {
     try {
       let state;
       try {
-        const response = await fetch('/api/state', { cache: 'no-store' });
+        const response = await fetch(`${channelBasePath}/api/state`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`Channel status request failed (${response.status}).`);
         state = await response.json();
       } catch (error) {

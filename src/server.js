@@ -133,7 +133,7 @@ async function serveMedia(request, response, channel, mediaFolder, id) {
 }
 
 async function handleRequest(request, response, options) {
-  const { channel, mediaFolder, publicFolder } = options;
+  const { routes, multiFolder, publicFolder } = options;
   let pathname;
   try {
     pathname = new URL(request.url, 'http://127.0.0.1').pathname;
@@ -143,15 +143,36 @@ async function handleRequest(request, response, options) {
     return;
   }
 
-  if (pathname === '/api/state' && request.method === 'GET') {
-    await channel.tick();
-    sendJson(response, 200, channel.state());
+  const route = routes.find(
+    (candidate) =>
+      candidate.basePath &&
+      (pathname === candidate.basePath || pathname.startsWith(`${candidate.basePath}/`)),
+  ) || (!multiFolder ? routes[0] : null);
+  const routePath = route?.basePath ? pathname.slice(route.basePath.length) || '/' : pathname;
+
+  if (route && routePath === '/api/state' && request.method === 'GET') {
+    await route.channel.tick();
+    sendJson(response, 200, route.channel.state());
     return;
   }
 
-  const mediaMatch = /^\/media\/([0-9]+)$/.exec(pathname);
+  const mediaMatch = route && /^\/media\/([0-9]+)$/.exec(routePath);
   if (mediaMatch) {
-    await serveMedia(request, response, channel, mediaFolder, mediaMatch[1]);
+    await serveMedia(request, response, route.channel, route.mediaFolder, mediaMatch[1]);
+    return;
+  }
+
+  if (route && (routePath === '/' || routePath === '') && await serveStatic(request, response, '/', publicFolder)) {
+    return;
+  }
+
+  if (
+    multiFolder &&
+    pathname === '/' &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
+    response.writeHead(200, { 'Content-Length': 0 });
+    response.end();
     return;
   }
 
@@ -162,8 +183,23 @@ async function handleRequest(request, response, options) {
 }
 
 export function createHttpServer(options) {
+  const routes = options.channels
+    ? options.channels.map((entry) => ({
+        ...entry,
+        basePath: entry.urlPath ? `/${entry.urlPath}` : '',
+      }))
+    : [
+        {
+          channel: options.channel,
+          mediaFolder: options.mediaFolder,
+          basePath: '',
+        },
+      ];
+  const multiFolder = routes.some((route) => route.basePath !== '');
+  const serverOptions = { ...options, routes, multiFolder };
+
   return http.createServer((request, response) => {
-    handleRequest(request, response, options).catch((error) => {
+    handleRequest(request, response, serverOptions).catch((error) => {
       (options.log || console).error(
         `Request failed (${request.method} ${request.url}): ${error.message}`,
       );

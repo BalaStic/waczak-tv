@@ -78,6 +78,57 @@ test('serves MP4 byte ranges with exact response headers and blocks arbitrary pa
   assert.equal(invalidRange.headers['content-range'], `bytes */${bytes.length}`);
 });
 
+test('routes multi-folder paths to separate channels and leaves the root blank', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const publicFolder = path.join(directory, 'public');
+  const firstFolder = path.join(directory, 'first');
+  const secondFolder = path.join(directory, 'second');
+  await fs.mkdir(publicFolder);
+  await fs.mkdir(firstFolder);
+  await fs.mkdir(secondFolder);
+  const firstBytes = Buffer.from('first channel');
+  const secondBytes = Buffer.from('second channel');
+  const firstPath = path.join(firstFolder, 'first.mp4');
+  const secondPath = path.join(secondFolder, 'second.mp4');
+  await fs.writeFile(firstPath, firstBytes);
+  await fs.writeFile(secondPath, secondBytes);
+  const channels = [
+    {
+      urlPath: 'first',
+      mediaFolder: firstFolder,
+      channel: new Channel(
+        [{ id: '0', filename: 'first.mp4', path: firstPath, duration: 30 }],
+        { mediaFolder: firstFolder },
+      ),
+    },
+    {
+      urlPath: 'second',
+      mediaFolder: secondFolder,
+      channel: new Channel(
+        [{ id: '0', filename: 'second.mp4', path: secondPath, duration: 30 }],
+        { mediaFolder: secondFolder },
+      ),
+    },
+  ];
+  const server = createHttpServer({ channels, publicFolder });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+
+  const firstState = await request(`${origin}/first/api/state`);
+  assert.equal(firstState.status, 200);
+  assert.equal(JSON.parse(firstState.body).item.filename, 'first.mp4');
+
+  const secondMedia = await request(`${origin}/second/media/0`);
+  assert.equal(secondMedia.status, 200);
+  assert.deepEqual(secondMedia.body, secondBytes);
+
+  const root = await request(`${origin}/`);
+  assert.equal(root.status, 200);
+  assert.equal(root.body.length, 0);
+});
+
 test('uses the server state endpoint as the playback authority', async (t) => {
   const directory = await temporaryDirectory();
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
