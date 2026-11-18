@@ -84,6 +84,16 @@ async function serveMedia(request, response, channel, mediaFolder, id) {
     return;
   }
 
+  const contentType = {
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+  }[path.extname(item.filename).toLowerCase()];
+  if (!contentType) {
+    response.writeHead(415, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Unsupported media type');
+    return;
+  }
+
   let file;
   try {
     file = await readSafeMediaFile(item, mediaFolder);
@@ -109,7 +119,7 @@ async function serveMedia(request, response, channel, mediaFolder, id) {
   const end = range?.end ?? file.size - 1;
   const headers = {
     'Accept-Ranges': 'bytes',
-    'Content-Type': 'video/mp4',
+    'Content-Type': contentType,
     'Content-Length': range ? end - start + 1 : file.size,
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',

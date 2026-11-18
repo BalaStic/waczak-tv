@@ -63,6 +63,7 @@ test('serves MP4 byte ranges with exact response headers and blocks arbitrary pa
     headers: { Range: 'bytes=4-9' },
   });
   assert.equal(rangeResponse.status, 206);
+  assert.equal(rangeResponse.headers['content-type'], 'video/mp4');
   assert.equal(rangeResponse.headers['content-range'], `bytes 4-9/${bytes.length}`);
   assert.equal(rangeResponse.headers['content-length'], '6');
   assert.equal(rangeResponse.headers['accept-ranges'], 'bytes');
@@ -76,6 +77,30 @@ test('serves MP4 byte ranges with exact response headers and blocks arbitrary pa
   });
   assert.equal(invalidRange.status, 416);
   assert.equal(invalidRange.headers['content-range'], `bytes */${bytes.length}`);
+});
+
+test('serves WebM byte ranges with the WebM content type', async (t) => {
+  const directory = await temporaryDirectory();
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const mediaPath = path.join(directory, 'episode.webm');
+  const bytes = Buffer.from('webm video bytes');
+  await fs.writeFile(mediaPath, bytes);
+
+  const channel = new Channel(
+    [{ id: '0', filename: 'episode.webm', path: mediaPath, duration: 30 }],
+    { mediaFolder: directory, log: { error: assert.fail } },
+  );
+  const server = createHttpServer({ channel, mediaFolder: directory, publicFolder: directory });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+
+  const response = await request(`http://127.0.0.1:${server.address().port}/media/0`, {
+    headers: { Range: 'bytes=1-4' },
+  });
+  assert.equal(response.status, 206);
+  assert.equal(response.headers['content-type'], 'video/webm');
+  assert.equal(response.headers['content-range'], `bytes 1-4/${bytes.length}`);
+  assert.deepEqual(response.body, bytes.subarray(1, 5));
 });
 
 test('routes multi-folder paths to separate channels and leaves the root blank', async (t) => {

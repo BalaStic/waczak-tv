@@ -2,7 +2,7 @@
   "name": "waczak-tv",
   "version": "1.0.0",
   "private": true,
-  "description": "A locally hosted, shared MP4 channel for Windows",
+  "description": "A locally hosted, shared video channel for Windows",
   "type": "module",
   "scripts": {
     "start": "node src/main.js",

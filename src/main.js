@@ -33,7 +33,7 @@ export async function start() {
     });
 
     const route = folder.urlPath ? ` at /${folder.urlPath}` : '';
-    console.log(`Loaded ${items.length} playable MP4 file(s) from ${folder.mediaFolder}${route}.`);
+    console.log(`Loaded ${items.length} playable video file(s) from ${folder.mediaFolder}${route}.`);
     if (restored.position > 0) {
       console.log(
         `Resuming ${items[restored.index].filename} at ${restored.position.toFixed(1)} seconds${route}.`,

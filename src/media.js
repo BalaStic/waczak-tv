@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+const supportedMediaExtensions = new Set(['.mp4', '.webm']);
 
 export function compareFilenames(left, right) {
   const leftLower = left.toLowerCase();
@@ -105,12 +106,17 @@ export async function loadMediaSnapshot(mediaFolder, options = {}) {
   }
 
   const candidates = entries
-    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === '.mp4')
+    .filter(
+      (entry) =>
+        entry.isFile() && supportedMediaExtensions.has(path.extname(entry.name).toLowerCase()),
+    )
     .map((entry) => entry.name)
     .sort(compareFilenames);
 
   if (candidates.length === 0) {
-    throw new Error(`No MP4 files were found in ${mediaFolder}. Add MP4 files and restart.`);
+    throw new Error(
+      `No MP4 or WebM files were found in ${mediaFolder}. Add supported video files and restart.`,
+    );
   }
 
   const playable = [];
@@ -139,7 +145,7 @@ export async function loadMediaSnapshot(mediaFolder, options = {}) {
 
   if (playable.length === 0) {
     throw new Error(
-      `No playable MP4 files were found in ${mediaFolder}. Check the reported media errors and add a supported file.`,
+      `No playable MP4 or WebM files were found in ${mediaFolder}. Check the reported media errors and add a supported file.`,
     );
   }
 

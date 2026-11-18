@@ -9,11 +9,12 @@ async function temporaryDirectory() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'waczak-tv-media-'));
 }
 
-test('snapshots regular MP4 files in deterministic alphabetical order and reports failures', async (t) => {
+test('snapshots regular MP4 and WebM files in deterministic alphabetical order and reports failures', async (t) => {
   const mediaFolder = await temporaryDirectory();
   t.after(() => fs.rm(mediaFolder, { recursive: true, force: true }));
   await fs.writeFile(path.join(mediaFolder, 'b.MP4'), 'b');
   await fs.writeFile(path.join(mediaFolder, 'A.mp4'), 'a');
+  await fs.writeFile(path.join(mediaFolder, 'c.WebM'), 'c');
   await fs.writeFile(path.join(mediaFolder, 'broken.mp4'), 'broken');
   await fs.mkdir(path.join(mediaFolder, 'directory.mp4'));
   const unavailable = [];
@@ -26,7 +27,7 @@ test('snapshots regular MP4 files in deterministic alphabetical order and report
     onUnavailable: (filename, reason) => unavailable.push({ filename, reason }),
   });
 
-  assert.deepEqual(items.map((item) => item.filename), ['A.mp4', 'b.MP4']);
+  assert.deepEqual(items.map((item) => item.filename), ['A.mp4', 'b.MP4', 'c.WebM']);
   assert.deepEqual(unavailable, [{ filename: 'broken.mp4', reason: 'no usable duration' }]);
 });
 
@@ -41,6 +42,6 @@ test('fails if no candidate has usable media', async (t) => {
         throw new Error('missing duration');
       },
     }),
-    /No playable MP4 files/,
+    /No playable MP4 or WebM files/,
   );
 });

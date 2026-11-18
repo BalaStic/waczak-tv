@@ -1,13 +1,13 @@
 # waczak-tv
 
-A manually launched, Windows-hosted MP4 channel for browsers on the same PC. The server owns one alphabetical playlist clock; viewers join its current position and cannot control or advance the channel.
+A manually launched, Windows-hosted video channel for browsers on the same PC. The server owns one alphabetical playlist clock; viewers join its current position and cannot control or advance the channel.
 
 ## Requirements
 
 - Windows 10/11.
 - Node.js 20 or later.
 - FFmpeg's `ffprobe` available on `PATH`, or set `FFPROBE_PATH` to its full executable path.
-- MP4 files with a readable video stream and usable duration. H.264/AVC is recommended for Edge, Chrome, and Firefox on Windows; AAC-LC is suitable when a file has audio. Browser/Windows codec support still varies.
+- MP4 or WebM files with a readable video stream and usable duration. H.264/AVC is recommended for MP4 in Edge, Chrome, and Firefox on Windows; AAC-LC is suitable when an MP4 file has audio. Browser/Windows codec support still varies.
 
 ## Configure and launch
 
@@ -41,12 +41,12 @@ The native player follows the shared channel item and live position. It starts m
 
 The configuration path can be overridden with `WACZAK_TV_CONFIG`; the port can be changed with `PORT`. The server always binds to `127.0.0.1`, never a LAN interface.
 
-At launch, the server snapshots regular `.mp4` files in each configured folder, sorts names case-insensitively with a deterministic tie-break, and asks `ffprobe` to confirm a video stream and positive duration. Each folder has its own channel and playback checkpoint. Unusable files are reported by name and skipped. The server exits with a clear error if a folder is missing/unreadable or no playable file remains. Add or remove files by restarting the server.
+At launch, the server snapshots regular `.mp4` and `.webm` files in each configured folder, sorts names case-insensitively with a deterministic tie-break, and asks `ffprobe` to confirm a video stream and positive duration. Each folder has its own channel and playback checkpoint. Unusable files are reported by name and skipped. The server exits with a clear error if a folder is missing/unreadable or no playable file remains. Add or remove files by restarting the server.
 
 ## Playback and recovery
 
 - Viewers load the same server-authoritative item and playhead. The viewer polls every two seconds and allows only one state request at a time. After loading metadata, it seeks to the reported position adjusted by the server timestamp. Drift greater than 1.5 seconds is corrected locally; smaller drift is left alone. If a state request fails, the viewer shows a reconnecting message, keeps its current item without advancing the channel, and retries on the next poll. A successful poll reconciles it with the latest server item and position; returning to a visible tab also triggers an immediate poll. Playback starts muted, but each viewer can unmute or adjust volume independently. Browser stalls or decode errors affect only that viewer.
-- MP4 delivery supports byte ranges for seeking and late joins. The server serves only IDs from its startup media snapshot and verifies that each requested file resolves directly inside the configured folder.
+- MP4 and WebM delivery supports byte ranges for seeking and late joins. The server selects the corresponding video MIME type, serves only IDs from its startup media snapshot, and verifies that each requested file resolves directly inside the configured folder.
 - Playback position is checkpointed atomically every five seconds and on item transitions to `%LOCALAPPDATA%\waczak-tv\checkpoint.json`. Downtime does not advance the saved position. If a checkpoint write fails, the failure is logged, playback continues, and a later checkpoint retries the save. If a saved file is no longer playable, the next alphabetical item is selected; malformed checkpoints are warned about and ignored.
 - Files are rechecked when they are scheduled and while they are current. If a scheduled file becomes unavailable, the server logs its filename and reason, then checks following alphabetical candidates, wrapping at most once. If none are playable, the channel stops and reports a clear error in the server console and viewer page.
 
