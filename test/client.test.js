@@ -91,7 +91,7 @@ function playingState({ id = '42', filename = 'episode.mp4', position = 10, serv
   };
 }
 
-async function createViewer(initialState, initialTime = 10000) {
+async function createViewer(initialState, initialTime = 10000, pathname = '/') {
   const elements = new Map([
     ['#video', new FakeVideo()],
     ['#channel-status', new FakeElement()],
@@ -115,6 +115,7 @@ async function createViewer(initialState, initialTime = 10000) {
     },
   };
   const window = {
+    location: { pathname },
     setInterval(callback, delay) {
       intervals.push({ callback, delay });
       return intervals.length;
@@ -184,6 +185,12 @@ async function createViewer(initialState, initialTime = 10000) {
     },
   };
 }
+
+test('uses the selected URL path for channel state and media requests', async () => {
+  const viewer = await createViewer(playingState({ serverTimeMs: 10000 }), 10000, '/waczak-tv');
+  assert.equal(viewer.requests[0][0], '/waczak-tv/api/state');
+  assert.equal(viewer.video.src, '/waczak-tv/media/42');
+});
 
 test('late viewers wait for metadata, seek to the server position, and play muted at low volume', async () => {
   const viewer = await createViewer(playingState({ serverTimeMs: 9000 }));
