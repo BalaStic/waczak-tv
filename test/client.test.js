@@ -113,6 +113,9 @@ async function createViewer(initialState, initialTime = 10000, pathname = '/') {
     addEventListener(type, listener) {
       documentListeners.set(type, listener);
     },
+    async dispatch(type, event = {}) {
+      await documentListeners.get(type)?.(event);
+    },
   };
   const window = {
     location: { pathname },
@@ -171,6 +174,7 @@ async function createViewer(initialState, initialTime = 10000, pathname = '/') {
 
   return {
     elements,
+    document,
     video: elements.get('#video'),
     intervals,
     requests,
@@ -268,6 +272,74 @@ test('drift at the tolerance is ignored and larger drift is corrected on the nex
   viewer.queueState(playingState({ serverTimeMs: 10000 }));
   await viewer.poll();
   assert.deepEqual(viewer.video.seekLog, [10, 10]);
+});
+
+test('recovers playback after a background interruption when the viewer returns', async () => {
+  const viewer = await createViewer(playingState({ serverTimeMs: 10000 }));
+  viewer.video.readyState = 1;
+  await viewer.video.dispatch('loadedmetadata');
+
+  viewer.document.hidden = true;
+  viewer.video.paused = true;
+  viewer.video.playBehavior = async () => {
+    throw Object.assign(
+      new Error('video-only background media was paused to save power'),
+      { name: 'AbortError' },
+    );
+  };
+  viewer.setNow(20000);
+  viewer.queueState(playingState({ serverTimeMs: 10000 }));
+  await viewer.poll();
+  assert.match(viewer.elements.get('#error-message').textContent, /paused to save power/);
+
+  viewer.document.hidden = false;
+  viewer.video.playBehavior = async () => {};
+  viewer.setNow(21000);
+  viewer.queueState(playingState({ serverTimeMs: 10000 }));
+  await viewer.document.dispatch('visibilitychange');
+
+  assert.equal(viewer.video.seekLog.length, 3);
+  assert.ok(Math.abs(viewer.video.seekLog[2] - 21) < 0.001);
+  assert.equal(viewer.video.paused, false);
+  assert.equal(viewer.elements.get('#error-message').hidden, true);
+  assert.equal(viewer.elements.get('#start-button').hidden, true);
+  assert.equal(viewer.elements.get('#channel-status').textContent, 'On air');
+  assert.equal(viewer.video.src, '/media/42');
+});
+
+test('offers a user gesture when playback remains blocked after a background interruption', async () => {
+  const viewer = await createViewer(playingState({ serverTimeMs: 10000 }));
+  viewer.video.readyState = 1;
+  await viewer.video.dispatch('loadedmetadata');
+
+  viewer.document.hidden = true;
+  viewer.video.paused = true;
+  viewer.video.playBehavior = async () => {
+    throw Object.assign(new Error('interrupted in background'), { name: 'AbortError' });
+  };
+  viewer.setNow(20000);
+  viewer.queueState(playingState({ serverTimeMs: 10000 }));
+  await viewer.poll();
+
+  viewer.document.hidden = false;
+  viewer.video.playBehavior = async () => {
+    throw Object.assign(new Error('autoplay denied'), { name: 'NotAllowedError' });
+  };
+  viewer.setNow(21000);
+  viewer.queueState(playingState({ serverTimeMs: 10000 }));
+  await viewer.document.dispatch('visibilitychange');
+
+  assert.equal(viewer.video.playCalls, 3);
+  assert.equal(viewer.elements.get('#start-button').hidden, false);
+  assert.match(viewer.elements.get('#video-message').textContent, /Start playback/);
+  assert.equal(viewer.elements.get('#error-message').hidden, true);
+
+  viewer.video.playBehavior = async () => {};
+  await viewer.elements.get('#start-button').dispatch('click');
+  assert.equal(viewer.video.paused, false);
+  assert.equal(viewer.elements.get('#start-button').hidden, true);
+  assert.equal(viewer.elements.get('#error-message').hidden, true);
+  assert.equal(viewer.elements.get('#channel-status').textContent, 'On air');
 });
 
 test('state polling never overlaps requests', async () => {

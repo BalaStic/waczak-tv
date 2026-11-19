@@ -22,6 +22,7 @@ let pollInProgress = null;
 let connectionError = null;
 let playbackError = null;
 let playbackNotice = null;
+let playbackInterrupted = false;
 
 function renderMessages() {
   const visibleError = playbackError || connectionError;
@@ -38,9 +39,10 @@ function updateVolumeControls() {
   volumeSlider.value = String(video.volume);
 }
 
-function showPlaybackError(message) {
+function showPlaybackError(message, recoverable = false) {
   playbackError = message;
   playbackNotice = null;
+  playbackInterrupted = recoverable;
   renderMessages();
   statusElement.textContent = 'Playback issue';
 }
@@ -68,12 +70,16 @@ async function startVideo(itemId, generation) {
     startButton.hidden = true;
     playbackError = null;
     playbackNotice = null;
+    playbackInterrupted = false;
     renderMessages();
     statusElement.textContent = connectionError ? 'Reconnecting…' : 'On air';
   } catch (error) {
     if (!isCurrentLoad(itemId, generation)) return;
     if (error?.name !== 'NotAllowedError') {
-      showPlaybackError(`Could not start playback: ${error?.message || 'Unknown playback error.'}`);
+      showPlaybackError(
+        `Could not start playback: ${error?.message || 'Unknown playback error.'}`,
+        error?.name === 'AbortError',
+      );
       return;
     }
     pendingPlay = true;
@@ -94,6 +100,7 @@ async function applyState(state) {
     loadGeneration += 1;
     currentItemId = null;
     pendingPlay = false;
+    playbackInterrupted = false;
     playbackNotice = null;
     video.pause();
     showPlaybackError(state.error || 'The channel stopped.');
@@ -113,6 +120,7 @@ async function applyState(state) {
     const itemId = currentItemId;
     pendingPlay = true;
     playbackError = null;
+    playbackInterrupted = false;
     playbackNotice = 'Loading channel…';
     startButton.hidden = true;
     renderMessages();
@@ -140,13 +148,21 @@ async function applyState(state) {
     : pendingPlay && !startButton.hidden
       ? 'Playback needs permission'
       : 'On air';
-  if (!playbackError && !video.error && video.readyState >= HTMLMediaElement.HAVE_METADATA && !video.seeking) {
+  const shouldResume = playbackInterrupted && !document.hidden;
+  if ((!playbackError || shouldResume) && !video.error
+    && video.readyState >= HTMLMediaElement.HAVE_METADATA && !video.seeking) {
     const target = targetPosition(state);
     const drift = target - video.currentTime;
-    if (Math.abs(drift) > driftToleranceSeconds) {
+    if (shouldResume || Math.abs(drift) > driftToleranceSeconds) {
       try {
         video.currentTime = target;
-        if (video.paused && !pendingPlay) await startVideo(currentItemId, loadGeneration);
+        if ((video.paused && !pendingPlay) || shouldResume) {
+          if (shouldResume) {
+            playbackError = null;
+            playbackInterrupted = false;
+          }
+          await startVideo(currentItemId, loadGeneration);
+        }
       } catch (error) {
         showPlaybackError(`Could not resynchronize playback: ${error.message}`);
       }
@@ -183,6 +199,7 @@ async function pollState() {
 }
 
 video.addEventListener('error', () => {
+  playbackInterrupted = false;
   const code = video.error?.code;
   const reasons = {
     2: 'A network error interrupted this video.',
@@ -201,6 +218,7 @@ video.addEventListener('playing', () => {
   if (!pendingPlay) {
     playbackNotice = null;
     playbackError = null;
+    playbackInterrupted = false;
     renderMessages();
     statusElement.textContent = connectionError ? 'Reconnecting…' : 'On air';
   }
@@ -237,7 +255,7 @@ startButton.addEventListener('click', async () => {
 });
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) pollState();
+  if (!document.hidden) return pollState();
 });
 
 pollState();
